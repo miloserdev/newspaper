@@ -1,0 +1,12 @@
+{
+  "title": "Releases",
+  "description": "Version history",
+  "$id": "releases",
+  "root": true,
+  "icon": "Package",
+  "color": "hsl(8 85% 60%)",
+  "pages": [
+    "...",
+    "archive"
+  ]
+}

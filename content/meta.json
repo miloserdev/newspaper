@@ -1,0 +1,15 @@
+{
+  "title": "Newspaper",
+  "description": "News from markdown files",
+  "icon": "BookOpen",
+  "pages": [
+    "---Menu---",
+    "news",
+    "guides",
+    "---Community---",
+    "events",
+    "opinions",
+    "---",
+    "..."
+  ]
+}

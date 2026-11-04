@@ -1,0 +1,8 @@
+{
+  "title": "Events",
+  "description": "Meetups and announcements",
+  "$id": "events",
+  "root": true,
+  "icon": "CalendarDays",
+  "color": "hsl(45 93% 58%)"
+}

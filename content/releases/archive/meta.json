@@ -1,0 +1,7 @@
+{
+  "title": "Archive",
+  "description": "Old versions",
+  "$id": "releases_archive",
+  "root": true,
+  "icon": "Archive"
+}

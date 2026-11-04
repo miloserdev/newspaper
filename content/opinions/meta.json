@@ -1,0 +1,8 @@
+{
+  "title": "Opinions",
+  "description": "Columns and thoughts",
+  "$id": "opinions",
+  "root": true,
+  "icon": "MessageSquareQuote",
+  "color": "hsl(280 70% 70%)"
+}

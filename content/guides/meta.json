@@ -1,0 +1,13 @@
+{
+  "title": "Guides",
+  "description": "How to use the engine",
+  "$id": "guides",
+  "root": true,
+  "icon": "GraduationCap",
+  "color": "hsl(217 90% 65%)",
+  "pages": [
+    "quick-start",
+    "...",
+    "deploy"
+  ]
+}
