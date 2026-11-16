@@ -10,6 +10,7 @@ export const config = {
   contentDir: "./content",
   /** Links at the bottom of the menu */
   links: [
+    { title: "GitHub", href: "https://github.com/miloserdev/newspaper" },
     { title: "Next.js", href: "https://nextjs.org" },
     { title: "shadcn/ui", href: "https://ui.shadcn.com" },
   ],
