@@ -6,6 +6,21 @@ import { Search as SearchIcon, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import MiniSearch from "minisearch";
+import { BASE_PATH } from "@/lib/base-path";
+import { indexOptions, makeSnippet, queryOptions } from "@/lib/search-shared";
+
+let indexPromise: Promise<MiniSearch> | null = null;
+/** The index is a prebuilt JSON file; fetched on first use and again each time the dialog opens (HTTP cache keeps it cheap) */
+function loadIndex(fresh = false) {
+  if (!indexPromise || fresh) {
+    indexPromise = fetch(`${BASE_PATH}/data/search-index.json`)
+      .then((r) => r.text())
+      .then((t) => MiniSearch.loadJSON(t, indexOptions));
+    indexPromise.catch(() => (indexPromise = null));
+  }
+  return indexPromise;
+}
 
 interface Result { title: string; href: string; section: string; tags: string[]; snippet: string }
 
@@ -20,6 +35,10 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
   const [active, setActive] = useState(0);
   const router = useRouter();
   const seq = useRef(0);
+
+  useEffect(() => {
+    if (open) loadIndex(true).catch(() => {});
+  }, [open]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -38,8 +57,16 @@ export function SearchProvider({ children }: { children: React.ReactNode }) {
     const t = setTimeout(async () => {
       setLoading(true);
       try {
-        const r = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
-        const j = await r.json();
+        const ms = await loadIndex();
+        const j = {
+          results: ms.search(q, queryOptions).slice(0, 20).map((h) => ({
+            title: h.title as string,
+            href: h.href as string,
+            section: h.section as string,
+            tags: h.tagList as string[],
+            snippet: makeSnippet(h.preview as string, h.description as string, q),
+          })),
+        };
         if (id === seq.current) {
           setResults(j.results);
           setActive(0);

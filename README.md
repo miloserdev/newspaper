@@ -7,7 +7,8 @@
 - **Just files.** The site structure is built by walking the content directory. Sort order comes from file creation time; edits show up as "updated".
 - **fumadocs-style metadata.** `title`, `description`, `tags` from the frontmatter, and `meta.json` per directory (`title`, `description`, `icon`, `color`, `pages`) for the menu.
 - **Obsidian-friendly.** `[[wikilinks]]`, `![[image.png]]` embeds, callouts (`> [!note]`), nested folders.
-- **Search out of the box.** Full-text, typo-tolerant, no external service — <kbd>Ctrl</kbd>+<kbd>K</kbd>.
+- **Search out of the box.** Full-text, typo-tolerant, runs in the browser from a prebuilt index — no server, no external service — <kbd>Ctrl</kbd>+<kbd>K</kbd>.
+- **Static export.** `npm run build:static` produces a plain HTML site (`out/`) — GitHub Pages workflow included.
 - **Infinite scroll** in the feed and in the `<NewsList />` component.
 - Dark / light / system theme. Responsive: three columns from 1024px, a single column on mobile.
 
@@ -41,7 +42,30 @@ npm start          # PORT=8080 npm start to change the port
 
 The workflow is: edit files (e.g. in Obsidian) → upload them to the server → `npm run build` → restart `npm start`.
 
-Section feeds, article pages and search read the files at request time, so a new file already shows up there without a rebuild. The home page and the menu counters are prerendered, so they update after the next `npm run build`.
+Search and feed data are generated at build time (`/data/*.json`), so new files appear after the next `npm run build`. (`npm run dev` always shows the current files.)
+
+## GitHub Pages (static site / live demo)
+
+Push the whole project to GitHub and Pages rebuilds the site on every push. One-time setup:
+
+1. Push the repo (include `package-lock.json`).
+2. Repo → **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+
+That's it — [`.github/workflows/pages.yml`](.github/workflows/pages.yml) runs on every push to `main`/`master`, builds the static export and deploys it to `https://<user>.github.io/<repo>/`. The base path (`/<repo>`) is detected automatically; repos named `<user>.github.io` are served from the root.
+
+To build locally:
+
+```bash
+BASE_PATH=/my-repo npm run build:static   # omit BASE_PATH for a site served from the root
+npx serve out                             # or any static server
+```
+
+What's different in the static build:
+
+- The output is plain files in `out/` — host it anywhere (GitHub Pages, Netlify, nginx).
+- Search runs in the browser against `data/search-index.json`; the feed is paged JSON files in `data/feed/`.
+- **Dates come from git history** in the workflow (`GIT_DATES=1`, full clone): first commit of a file = created, last commit = updated. A fresh checkout gives every file the same filesystem time, so without this all posts would share one date. A `date:` in the frontmatter always wins. If you import a whole vault in a single commit, put `date:` in the frontmatter to get a meaningful order.
+- Content changes need a new build (a new push) — nothing is read at request time.
 
 ## Content structure
 
@@ -146,9 +170,10 @@ GFM (tables, task lists, strikethrough), syntax-highlighted code with a copy but
 ```
 config.ts          engine config
 lib/content.ts     directory walk, frontmatter, meta.json, menu tree, ordering
-lib/feed.ts        feed pagination
+lib/feed.ts        feed pagination (JSON pages)
+lib/search-*.ts    search index: built at build time, queried in the browser
 lib/markdown.ts    Obsidian syntax → markdown
-app/               routes: /, /[section], /[section]/[...slug], /tag/[tag], /api/search, /api/feed, /files/*
+app/               routes: /, /[section], /[section]/[...slug], /tag/[tag], /data/* (search index, feed pages), /files/*
 components/        UI (sidebar, feed, reader, search, theme toggle) and components/ui (shadcn)
 content/           demo content
 ```
@@ -159,5 +184,6 @@ content/           demo content
 | --- | --- |
 | `npm run dev` | dev server with live reload |
 | `npm run build` | production build |
+| `npm run build:static` | static export into `out/` (`BASE_PATH`, `GIT_DATES=1` optional) |
 | `npm start` | serve the production build |
 | `npm run lint` | ESLint |

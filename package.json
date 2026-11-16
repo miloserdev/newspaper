@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "build:static": "STATIC_EXPORT=1 next build",
+    "preview:static": "npx --yes serve out"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

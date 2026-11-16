@@ -3,6 +3,7 @@ import Link from "next/link";
 import ReactMarkdown, { type Components } from "react-markdown";
 import { InfiniteItems } from "./infinite-items";
 import { queryFeed } from "@/lib/feed";
+import { BASE_PATH } from "@/lib/base-path";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import rehypeSlug from "rehype-slug";
@@ -100,9 +101,10 @@ const enc = (p: string) => p.split("/").map(encodeURIComponent).join("/");
 
 export function Markdown({ doc }: { doc: Doc }) {
   const resolve = (src: string) => {
-    if (/^([a-z]+:)?\/\//i.test(src) || src.startsWith("/") || src.startsWith("data:")) return src;
+    if (/^([a-z]+:)?\/\//i.test(src) || src.startsWith("data:")) return src;
+    if (src.startsWith("/")) return BASE_PATH + src; // /files/... made by the Obsidian ![[embed]] preprocessor
     const rel = path.posix.normalize(path.posix.join(doc.relDir.split(path.sep).join("/"), decodeURIComponent(src)));
-    return `/files/${enc(rel)}`;
+    return `${BASE_PATH}/files/${enc(rel)}`;
   };
   return (
     <div className="prose prose-neutral dark:prose-invert max-w-none prose-img:rounded-lg prose-li:my-1 prose-h1:text-2xl prose-h2:mt-10 break-words [overflow-wrap:anywhere]">

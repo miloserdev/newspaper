@@ -5,6 +5,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BASE_PATH } from "@/lib/base-path";
+
+const PAGE_SIZE = 30;
+
+/** Must match feedKey() in lib/feed.ts */
+const scopeKey = (s: { section?: string; tag?: string }) =>
+  s.section ? `s~${s.section}` : s.tag ? `t~${s.tag.toLowerCase().replace(/[\\/]+/g, "~")}` : "all";
 
 export interface FeedItem {
   href: string;
@@ -37,6 +44,7 @@ export function InfiniteItems({
   const [loading, setLoading] = useState(false);
   const busy = useRef(false);
   const sentinel = useRef<HTMLDivElement>(null);
+  const key = scopeKey(scope);
   const hasMore = items.length < total;
 
   const loadMore = useCallback(async () => {
@@ -44,17 +52,15 @@ export function InfiniteItems({
     busy.current = true;
     setLoading(true);
     try {
-      const q = new URLSearchParams({ offset: String(items.length) });
-      if (scope.section) q.set("section", scope.section);
-      if (scope.tag) q.set("tag", scope.tag);
-      const r = await fetch(`/api/feed?${q}`);
+      const page = Math.floor(items.length / PAGE_SIZE);
+      const r = await fetch(`${BASE_PATH}/data/feed/${encodeURIComponent(key)}/${page}.json`);
       const j: { items: FeedItem[] } = await r.json();
       setItems((prev) => [...prev, ...j.items.filter((n) => !prev.some((p) => p.href === n.href))]);
     } finally {
       busy.current = false;
       setLoading(false);
     }
-  }, [items.length, scope.section, scope.tag]);
+  }, [items.length, key]);
 
   useEffect(() => {
     const el = sentinel.current;

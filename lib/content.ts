@@ -1,6 +1,7 @@
 import "server-only";
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import matter from "gray-matter";
 import { config } from "@/config";
 
@@ -58,7 +59,97 @@ export interface Doc {
   text: string;
 }
 
-const ROOT = path.resolve(process.cwd(), config.contentDir);
+/** Removes // and /* *\/ comments and trailing commas (outside strings) so hand-edited meta.json still parses */
+function stripLooseJson(src: string): string {
+  const out: string[] = [];
+  let i = 0;
+  if (src.charCodeAt(0) === 0xfeff) i = 1;
+  while (i < src.length) {
+    const c = src[i];
+    if (c === '"') {
+      let j = i + 1;
+      while (j < src.length && src[j] !== '"') j += src[j] === "\\" ? 2 : 1;
+      out.push(src.slice(i, j + 1));
+      i = j + 1;
+    } else if (c === "/" && src[i + 1] === "/") {
+      while (i < src.length && src[i] !== "\n") i++;
+    } else if (c === "/" && src[i + 1] === "*") {
+      const end = src.indexOf("*/", i + 2);
+      i = end < 0 ? src.length : end + 2;
+    } else {
+      if (c === "}" || c === "]") {
+        let k = out.length - 1;
+        while (k >= 0 && /^\s*$/.test(out[k])) k--;
+        if (k >= 0 && out[k] === ",") out.splice(k, 1);
+      }
+      out.push(c);
+      i++;
+    }
+  }
+  return out.join("");
+}
+
+const warned = new Set<string>();
+
+/** meta.json reader: loose JSON allowed; a missing file is fine, a broken one is reported (once per edit) instead of silently ignored */
+function readMeta(file: string): Record<string, unknown> | null {
+  let raw: string;
+  let mtime: number;
+  try {
+    raw = fs.readFileSync(file, "utf8");
+    mtime = fs.statSync(file).mtimeMs;
+  } catch {
+    return null;
+  }
+  try {
+    const v: unknown = JSON.parse(stripLooseJson(raw));
+    if (v && typeof v === "object" && !Array.isArray(v)) return v as Record<string, unknown>;
+    throw new Error("expected a JSON object");
+  } catch (e) {
+    const key = `${file}:${mtime}`;
+    if (!warned.has(key)) {
+      warned.add(key);
+      console.warn(`[content] ${path.relative(process.cwd(), file)}: invalid JSON, ignored (${(e as Error).message})`);
+    }
+    return null;
+  }
+}
+
+// the content directory is chosen at runtime — keep Turbopack from tracing the whole project for it
+/**
+ * GIT_DATES=1 (set by the GitHub Actions workflow): take created/updated times from git history,
+ * because a fresh checkout gives every file the same filesystem time.
+ */
+let gitDates: Map<string, { created: number; updated: number }> | null | undefined;
+function getGitDates(root: string) {
+  if (gitDates !== undefined) return gitDates;
+  gitDates = null;
+  if (process.env.GIT_DATES !== "1") return gitDates;
+  try {
+    const out = execFileSync(
+      "git",
+      ["-c", "core.quotepath=off", "log", "--relative", "--name-only", "--no-renames", "--format=@%ct", "--", "."],
+      { cwd: root, encoding: "utf8", maxBuffer: 256 * 1024 * 1024 },
+    );
+    const map = new Map<string, { created: number; updated: number }>();
+    let ts = 0;
+    for (const line of out.split("\n")) {
+      if (line.startsWith("@")) ts = Number(line.slice(1)) * 1000;
+      else if (line.trim()) {
+        const f = path.join(root, line.trim());
+        const e = map.get(f); // log is newest-first: first hit = last change, last hit = creation
+        if (e) e.created = ts;
+        else map.set(f, { created: ts, updated: ts });
+      }
+    }
+    gitDates = map;
+  } catch (e) {
+    console.warn("[content] GIT_DATES=1 but git history is unavailable (shallow clone?):", (e as Error).message.split("\n")[0]);
+  }
+  return gitDates;
+}
+
+const ROOT = path.resolve(/*turbopackIgnore: true*/ process.cwd(), config.contentDir);
 const ASSET_EXT = /\.(png|jpe?g|gif|webp|svg|avif|pdf|mp4|webm)$/i;
 const DOC_EXT = /\.mdx?$/i;
 
@@ -142,7 +233,7 @@ function parseFile(file: string, stat: fs.Stats, section: Section): Doc | null {
   const { data, content } = parseMatter(raw);
   if (data.draft === true && !config.showDrafts) return null;
 
-  const rel = path.relative(path.resolve(ROOT, section.dir), file);
+  const rel = path.relative(path.resolve(/*turbopackIgnore: true*/ ROOT, section.dir), file);
   const slug = rel.replace(DOC_EXT, "").split(path.sep).filter((x) => !/^\(.*\)$/.test(x));
   const baseName = slug[slug.length - 1];
 
@@ -159,8 +250,10 @@ function parseFile(file: string, stat: fs.Stats, section: Section): Doc | null {
   if (!title) title = baseName;
 
   const text = toPlain(body);
-  const created = stat.birthtimeMs > 0 ? stat.birthtimeMs : stat.mtimeMs;
-  const date = asMs(data.date) ?? Math.min(created, stat.mtimeMs);
+  const git = getGitDates(ROOT)?.get(file);
+  const created = git?.created ?? (stat.birthtimeMs > 0 ? stat.birthtimeMs : stat.mtimeMs);
+  const modified = git?.updated ?? stat.mtimeMs;
+  const date = asMs(data.date) ?? Math.min(created, modified);
 
   return {
     id: `${section.slug}/${slug.join("/")}`,
@@ -173,7 +266,7 @@ function parseFile(file: string, stat: fs.Stats, section: Section): Doc | null {
       typeof data.description === "string" ? data.description : "",
     tags: asArray(data.tags),
     date,
-    updated: stat.mtimeMs,
+    updated: modified,
     image: [data.image, data.cover].find((x): x is string => typeof x === "string"),
     folder: slug.length > 1 ? slug.slice(0, -1).join(" / ") : "",
     relDir: path.relative(ROOT, path.dirname(file)),
@@ -196,7 +289,7 @@ function scan() {
     const nested = sections.filter((o) => o !== section && o.dir.startsWith(section.dir + "/"));
     const isNested = (f: string) =>
       nested.some((o) => path.relative(ROOT, f).split(path.sep).join("/").startsWith(o.dir + "/"));
-    for (const file of walk(path.resolve(ROOT, section.dir))) {
+    for (const file of walk(path.resolve(/*turbopackIgnore: true*/ ROOT, section.dir))) {
       if (!DOC_EXT.test(file) || isNested(file)) continue;
       const stat = fs.statSync(file);
       const key = `${section.slug}:${file}`;
@@ -235,13 +328,8 @@ function discoverSections(): { sections: Section[]; menu: MenuItem[] } {
   const out: Section[] = [];
   for (const file of walk(ROOT)) {
     if (path.basename(file) !== "meta.json") continue;
-    let meta: Record<string, unknown>;
-    try {
-      meta = JSON.parse(fs.readFileSync(file, "utf8"));
-    } catch {
-      continue;
-    }
-    if (meta.root !== true) continue;
+    const meta = readMeta(file);
+    if (!meta || meta.root !== true) continue;
     const dir = path.relative(ROOT, path.dirname(file)).split(path.sep).join("/");
     if (!dir) continue;
     const plain = dir.split("/").filter((x) => !/^\(.*\)$/.test(x)).join("-") || dir;
@@ -335,10 +423,7 @@ function buildMenu(all: Section[], rootPages: string[]): MenuItem[] {
 
 /** The root meta.json in contentDir describes the site itself: title, description, icon */
 function readSite(): Site {
-  let meta: Record<string, unknown> = {};
-  try {
-    meta = JSON.parse(fs.readFileSync(path.join(ROOT, "meta.json"), "utf8"));
-  } catch {}
+  const meta = readMeta(path.join(ROOT, "meta.json")) ?? {};
   const str = (v: unknown, d: string) => (typeof v === "string" && v ? v : d);
   return {
     pages: asPages(meta.pages),
@@ -411,9 +496,24 @@ export function getDoc(section: string, slug: string[]) {
   return getDocs().find((d) => d.id === id);
 }
 
+/** Tags may contain "/" (Obsidian nested tags) — keep URLs to one segment */
+export const tagSlug = (t: string) => t.toLowerCase().replace(/[\\/]+/g, "~");
+
 export function getTagDocs(tag: string) {
-  const t = tag.toLowerCase();
-  return getDocs().filter((d) => d.tags.some((x) => x.toLowerCase() === t));
+  const t = tagSlug(tag);
+  return getDocs().filter((d) => d.tags.some((x) => tagSlug(x) === t));
+}
+
+/** One entry per distinct tag (first spelling wins) */
+export function getAllTags(): string[] {
+  const seen = new Map<string, string>();
+  for (const d of getDocs()) for (const t of d.tags) if (!seen.has(tagSlug(t))) seen.set(tagSlug(t), t);
+  return [...seen.values()];
+}
+
+/** Content-relative paths of all images/files (for static export) */
+export function getAssetPaths(): string[] {
+  return [...scan().assets.values()];
 }
 
 export function findAsset(name: string): string | undefined {
@@ -450,7 +550,7 @@ export function getLandingDoc(slug: string): Doc | undefined {
 
 /** Home: index.md(x) in the contentDir root (not part of sections or search) */
 export function getRootIndex(): Doc | undefined {
-  const file = ["index.md", "index.mdx"].map((n) => path.join(ROOT, n)).find((f) => fs.existsSync(f));
+  const file = ["index.md", "index.mdx"].map((n) => path.join(/*turbopackIgnore: true*/ ROOT, n)).find((f) => fs.existsSync(f));
   if (!file) return undefined;
   const site = getSite();
   const doc = parseFile(file, fs.statSync(file), {

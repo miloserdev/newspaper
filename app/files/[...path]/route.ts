@@ -1,6 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
-import { contentRoot } from "@/lib/content";
+import { contentRoot, getAssetPaths } from "@/lib/content";
+
+export const dynamic = "force-static";
+
+export function generateStaticParams() {
+  return getAssetPaths().map((p) => ({ path: p.split("/") }));
+}
 
 const TYPES: Record<string, string> = {
   ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",

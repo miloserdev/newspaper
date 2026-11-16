@@ -1,7 +1,11 @@
 import { EmptyReader } from "@/components/empty-reader";
 import { ArticleView } from "@/components/article";
 import { AutoOpen } from "@/components/auto-open";
-import { getLandingDoc } from "@/lib/content";
+import { getLandingDoc, getSections } from "@/lib/content";
+
+export function generateStaticParams() {
+  return getSections().map((s) => ({ section: s.slug }));
+}
 
 export default async function SectionPage({ params }: { params: Promise<{ section: string }> }) {
   const slug = decodeURIComponent((await params).section);

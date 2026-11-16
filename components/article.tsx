@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { fmtDate, type Doc } from "@/lib/content";
+import { fmtDate, tagSlug, type Doc } from "@/lib/content";
+import { BASE_PATH } from "@/lib/base-path";
 import { Markdown } from "@/components/markdown";
 import { Badge } from "@/components/ui/badge";
 
@@ -15,12 +16,12 @@ export function ArticleView({ doc, className = "", back = true }: { doc: Doc; cl
         </Link>}
         {doc.image && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={doc.image} alt="" className="mb-6 w-full rounded-xl border" />
+          <img src={doc.image.startsWith("/") && !doc.image.startsWith("//") ? BASE_PATH + doc.image : doc.image} alt="" className="mb-6 w-full rounded-xl border" />
         )}
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           <Badge variant="secondary">{doc.sectionTitle}</Badge>
           {doc.tags.map((t) => (
-            <Link key={t} href={`/tag/${encodeURIComponent(t)}`}>
+            <Link key={t} href={`/tag/${encodeURIComponent(tagSlug(t))}`}>
               <Badge variant="outline">#{t}</Badge>
             </Link>
           ))}
