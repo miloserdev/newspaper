@@ -4,6 +4,7 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import matter from "gray-matter";
 import { config } from "@/config";
+import { parseScriptTag, type ScriptTag } from "./script-tags";
 
 export interface Section {
   title: string;
@@ -29,6 +30,8 @@ export type MenuItem =
   | { kind: "separator"; label: string; depth: number };
 
 export interface Site {
+  /** <script> tags for every page's <head> (root meta.json `scripts`) */
+  scripts: ScriptTag[];
   /** Links at the bottom of the menu (root meta.json `links`, else config.links) */
   links: { title: string; href: string }[];
   pages: string[];
@@ -439,7 +442,9 @@ function readSite(): Site {
         return typeof o?.title === "string" && typeof o?.href === "string" ? [{ title: o.title, href: o.href }] : [];
       })
     : config.links;
+  const scripts = Array.isArray(meta.scripts) ? meta.scripts.flatMap((e) => parseScriptTag(e) ?? []) : [];
   return {
+    scripts,
     links,
     pages: asPages(meta.pages),
     title: str(meta.title, "Newspaper"),

@@ -5,6 +5,8 @@ import { Sidebar } from "@/components/sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SearchProvider } from "@/components/search";
 import { SectionIcon } from "@/components/icons";
+import { Analytics } from "@/components/analytics";
+import { toReactProps } from "@/lib/script-tags";
 
 export function generateMetadata(): Metadata {
   const site = getSite();
@@ -18,7 +20,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const site = getSite();
   return (
     <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* scripts from the root meta.json (analytics, …) */}
+        {site.scripts.map((t, i) => (
+          <script key={i} {...toReactProps(t.attrs)} dangerouslySetInnerHTML={t.inline ? { __html: t.inline } : undefined} />
+        ))}
+      </head>
       <body className="h-dvh overflow-hidden antialiased">
+        <Analytics />
         <ThemeProvider>
         <SearchProvider>
           <div className="flex h-full flex-col lg:flex-row">

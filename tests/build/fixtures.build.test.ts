@@ -67,3 +67,12 @@ test("site metadata comes from the vault's root meta.json", () => {
   assert.match(home, /<title>Fixture Basic<\/title>/);
   assert.ok(hrefs(home).includes("https://example.com"));
 });
+
+test("scripts from the root meta.json land in the <head> of every page (analytics)", () => {
+  for (const f of ["index.html", "handbook/setup.html", "news/2026/launch.html", "404.html"]) {
+    const head = read(f).match(/<head>([\s\S]*?)<\/head>/)![1];
+    assert.match(head, /<script[^>]*data-goatcounter="https:\/\/example\.goatcounter\.com\/count"[^>]*>/, `goatcounter in ${f}`);
+    assert.match(head, /src="\/\/gc\.zgo\.at\/count\.js"/, `src in ${f}`);
+    assert.match(head, /<script[^>]*src="https:\/\/example\.com\/obj\.js"[^>]*data-site="fx"|<script[^>]*data-site="fx"[^>]*src="https:\/\/example\.com\/obj\.js"/, `object form in ${f}`);
+  }
+});

@@ -2,6 +2,25 @@
   "title": "Fixture Basic",
   "description": "A vault with awkward paths",
   "icon": "BookOpen",
-  "links": [{ "title": "Example", "href": "https://example.com" }],
-  "pages": ["handbook", "---More---", "..."]
+  "links": [
+    {
+      "title": "Example",
+      "href": "https://example.com"
+    }
+  ],
+  "pages": [
+    "handbook",
+    "---More---",
+    "..."
+  ],
+  "scripts": [
+    {
+      "raw": "<script data-goatcounter=\"https://example.goatcounter.com/count\" async src=\"//gc.zgo.at/count.js\"></script>"
+    },
+    {
+      "src": "https://example.com/obj.js",
+      "defer": true,
+      "data-site": "fx"
+    }
+  ]
 }

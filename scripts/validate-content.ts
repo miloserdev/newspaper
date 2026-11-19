@@ -23,6 +23,7 @@ import {
   parseLooseJson,
   type Doc,
 } from "../lib/content";
+import { parseScriptTag } from "../lib/script-tags";
 
 type Level = "error" | "warning";
 export interface Issue {
@@ -81,6 +82,14 @@ for (const f of metaFiles) {
     }
   }
   if (m.pages !== undefined && !Array.isArray(m.pages)) add("error", "meta-pages-type", rel(f), "`pages` must be an array of strings");
+  if (m.scripts !== undefined) {
+    if (!Array.isArray(m.scripts)) add("error", "meta-scripts-type", rel(f), "`scripts` must be an array of objects: { \"raw\": \"<script …></script>\" } or { \"src\": …, \"async\": true }");
+    else {
+      m.scripts.forEach((e, i) => {
+        if (!parseScriptTag(e)) add("error", "meta-script-invalid", rel(f), `\`scripts[${i}]\` must be an object like { "raw": "<script …></script>" } or { "src": "…", "async": true }`);
+      });
+    }
+  }
   if (m.links !== undefined && !Array.isArray(m.links)) add("warning", "meta-links-type", rel(f), "`links` must be an array of { title, href }");
 }
 if (!metaFiles.some((f) => path.dirname(f) === contentRoot)) {

@@ -46,6 +46,7 @@ test("broken vault fails with every expected error code", () => {
     "frontmatter-invalid", // unquoted colon in YAML
     "link-outside-content",
     "meta-invalid-json",
+    "meta-script-invalid",
   ]);
 });
 

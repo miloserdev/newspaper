@@ -92,6 +92,35 @@ The site name, tagline, icon and the menu links are taken from the root `meta.js
 }
 ```
 
+### Analytics and other scripts
+
+Anything that has to go into the `<head>` of every page (GoatCounter, Plausible, …) is configured in the root `meta.json` of the content — the content repo needs no engine changes. `scripts` is an array of objects. Paste the vendor's snippet into `raw`:
+
+```json
+{
+  "title": "docs",
+  "scripts": [
+    { "raw": "<script data-goatcounter=\"https://miloserdev.goatcounter.com/count\" async src=\"//gc.zgo.at/count.js\"></script>" }
+  ]
+}
+```
+
+or describe the tag with attributes (no quote escaping needed):
+
+```json
+{ "scripts": [{ "src": "//gc.zgo.at/count.js", "async": true, "data-goatcounter": "https://miloserdev.goatcounter.com/count" }] }
+```
+
+| Key | |
+| --- | --- |
+| `raw` | a complete `<script …></script>` snippet; its attributes and body are used |
+| `src`, `async`, `defer`, `type`, `data-*`, … | any other key becomes an attribute of the tag (`true` = a bare attribute like `async`) |
+| `inline` | the script body |
+
+`raw` and attributes can be combined; an explicit key overrides what the snippet says. The validator reports entries that aren't an object describing a valid script.
+
+The site navigates on the client, so a counter script only sees the first page load. The engine reports every later page view to GoatCounter itself (`goatcounter.count()` on each route change, with the page's title). Other trackers: use their own single-page-app API, or a tracker that observes history changes. The scripts come from your own repository and run with full privileges on every page — only add code you trust.
+
 Locally, point the engine at any folder with `CONTENT_DIR`:
 
 ```bash

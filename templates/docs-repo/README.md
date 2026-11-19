@@ -22,6 +22,7 @@ Root `meta.json` example:
   "description": "documentation from markdown files",
   "icon": "BookOpen",
   "links": [{ "title": "@miloserdev", "href": "https://miloser.dev" }],
+  "scripts": [{ "raw": "<script data-goatcounter=\"https://<you>.goatcounter.com/count\" async src=\"//gc.zgo.at/count.js\"></script>" }],
   "pages": ["---Menu---", "readme", "---", "..."]
 }
 ```
