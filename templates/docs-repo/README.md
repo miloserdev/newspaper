@@ -36,3 +36,26 @@ Every push and pull request first **validates** the content (front matter, `meta
 
 Preview locally: clone the engine next to this repo and run
 `CONTENT_DIR=../docs npm run dev` in it.
+
+## Access to the engine repository
+
+The workflow downloads the engine (`ENGINE_REPO` in the workflow) on every run.
+
+- **Public engine repo** — nothing to do.
+- **Private engine repo** — the default workflow token can only read *this* repo. Create a fine-grained personal access token with **read-only "Contents"** access to the engine repo, and save it in this repo as the secret `ENGINE_TOKEN` (Settings → Secrets and variables → Actions). The workflow picks it up automatically.
+
+## Rebuilding when the engine changes
+
+A content push rebuilds the site, but an engine update doesn't on its own. Options:
+
+1. **Manually:** Actions → Deploy to GitHub Pages → Run workflow.
+2. **On a schedule:** uncomment the `schedule:` block in the workflow.
+3. **Automatically from the engine repo:** add a step there that fires the `engine-updated` event (needs a token with write access to this repo, stored in the engine repo as `DOCS_TOKEN`):
+
+   ```yaml
+   - run: gh api repos/<user>/docs/dispatches -f event_type=engine-updated
+     env:
+       GH_TOKEN: ${{ secrets.DOCS_TOKEN }}
+   ```
+
+   To keep builds reproducible, pin `ENGINE_REF` to a tag and bump it deliberately instead.

@@ -11,6 +11,10 @@ on:
     branches: [main, master]
   pull_request:
   workflow_dispatch: # also use "Run workflow" to rebuild after the engine was updated
+  repository_dispatch: # optional: let the engine repo trigger a rebuild (see README)
+    types: [engine-updated]
+  # schedule:          # optional: rebuild regularly to pick up engine updates
+  #   - cron: "0 5 * * 1"
 
 permissions:
   contents: read
@@ -42,6 +46,8 @@ jobs:
           repository: ${{ env.ENGINE_REPO }}
           ref: ${{ env.ENGINE_REF }}
           path: engine
+          # a public engine repo needs no token; for a private one add a read-only token as the ENGINE_TOKEN secret
+          token: ${{ secrets.ENGINE_TOKEN || github.token }}
 
       - uses: actions/setup-node@v4
         with:
