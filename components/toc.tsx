@@ -173,13 +173,14 @@ function AsideToc({ items, color }: { items: Item[]; color?: string }) {
       // accent = the section's `color` from meta.json (falls back to the foreground color)
       style={{ "--toc-accent": color || "var(--foreground)" } as React.CSSProperties}
     >
-      <div className="flex items-center gap-2 text-muted-foreground">
+      <div className="flex items-center gap-2 pl-1 text-muted-foreground">
         <AlignLeft className="size-4" strokeWidth={1.5} /> On this page
       </div>
       <div
         ref={areaRef}
-        // scrollable but with no scrollbar; both edges fade out (same recipe as fumadocs / shadcn)
-        className="relative mt-1 min-h-0 overflow-y-auto overscroll-contain py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        // scrollable but with no scrollbar; both edges fade out (same recipe as fumadocs / shadcn).
+        // pl-1: overflow-y:auto also clips horizontally — without the padding the left half of the thumb's end dot is cut off
+        className="relative mt-1 min-h-0 overflow-y-auto overscroll-contain py-3 pl-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         style={{
           maskImage: "linear-gradient(to bottom, transparent, black 16px, black calc(100% - 16px), transparent)",
           WebkitMaskImage: "linear-gradient(to bottom, transparent, black 16px, black calc(100% - 16px), transparent)",
