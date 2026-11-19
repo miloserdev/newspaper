@@ -4,7 +4,9 @@ import { Feed } from "@/components/feed";
 import { EmptyReader } from "@/components/empty-reader";
 
 export function generateStaticParams() {
-  return getAllTags().map((t) => ({ tag: tagSlug(t) }));
+  // `output: export` needs at least one route, even when no post has tags
+  const tags = getAllTags().map((t) => ({ tag: tagSlug(t) }));
+  return tags.length ? tags : [{ tag: "_none" }];
 }
 
 export default async function TagPage({ params }: { params: Promise<{ tag: string }> }) {

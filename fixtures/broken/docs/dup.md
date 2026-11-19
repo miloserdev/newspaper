@@ -1,0 +1,5 @@
+---
+title: Duplicate A
+---
+
+A.

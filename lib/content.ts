@@ -29,6 +29,8 @@ export type MenuItem =
   | { kind: "separator"; label: string; depth: number };
 
 export interface Site {
+  /** Links at the bottom of the menu (root meta.json `links`, else config.links) */
+  links: { title: string; href: string }[];
   pages: string[];
   title: string;
   description: string;
@@ -54,6 +56,8 @@ export interface Doc {
   folder: string;
   /** File directory relative to contentDir (for relative links) */
   relDir: string;
+  /** Path of the source file relative to contentDir (posix) */
+  file: string;
   body: string;
   excerpt: string;
   text: string;
@@ -89,6 +93,9 @@ function stripLooseJson(src: string): string {
   return out.join("");
 }
 
+/** Parses loose JSON (comments, trailing commas, BOM). Throws on real syntax errors. */
+export const parseLooseJson = (raw: string): unknown => JSON.parse(stripLooseJson(raw));
+
 const warned = new Set<string>();
 
 /** meta.json reader: loose JSON allowed; a missing file is fine, a broken one is reported (once per edit) instead of silently ignored */
@@ -102,7 +109,7 @@ function readMeta(file: string): Record<string, unknown> | null {
     return null;
   }
   try {
-    const v: unknown = JSON.parse(stripLooseJson(raw));
+    const v = parseLooseJson(raw);
     if (v && typeof v === "object" && !Array.isArray(v)) return v as Record<string, unknown>;
     throw new Error("expected a JSON object");
   } catch (e) {
@@ -198,7 +205,7 @@ const asArray = (v: unknown): string[] =>
       ? v.split(/[,\s]+/).filter(Boolean)
       : [];
 
-const asMs = (v: unknown): number | null => {
+export const asMs = (v: unknown): number | null => {
   if (v instanceof Date) return v.getTime();
   if (typeof v === "string" || typeof v === "number") {
     const t = new Date(v).getTime();
@@ -270,6 +277,7 @@ function parseFile(file: string, stat: fs.Stats, section: Section): Doc | null {
     image: [data.image, data.cover].find((x): x is string => typeof x === "string"),
     folder: slug.length > 1 ? slug.slice(0, -1).join(" / ") : "",
     relDir: path.relative(ROOT, path.dirname(file)),
+    file: path.relative(ROOT, file).split(path.sep).join("/"),
     body,
     excerpt: text.slice(0, 220),
     text,
@@ -425,7 +433,14 @@ function buildMenu(all: Section[], rootPages: string[]): MenuItem[] {
 function readSite(): Site {
   const meta = readMeta(path.join(ROOT, "meta.json")) ?? {};
   const str = (v: unknown, d: string) => (typeof v === "string" && v ? v : d);
+  const links = Array.isArray(meta.links)
+    ? meta.links.flatMap((l: unknown) => {
+        const o = l as { title?: unknown; href?: unknown };
+        return typeof o?.title === "string" && typeof o?.href === "string" ? [{ title: o.title, href: o.href }] : [];
+      })
+    : config.links;
   return {
+    links,
     pages: asPages(meta.pages),
     title: str(meta.title, "Newspaper"),
     description: str(meta.description, ""),
@@ -521,6 +536,13 @@ export function findAsset(name: string): string | undefined {
 }
 
 /** Finds a note for a [[wikilink]] by file name or title */
+/** Finds a post by its source path relative to contentDir (`news/a.md`; the extension may be omitted) */
+export function findDocByPath(rel: string): Doc | undefined {
+  const norm = path.posix.normalize(rel.split(path.sep).join("/")).replace(/^\.\//, "");
+  const candidates = new Set([norm, `${norm}.md`, `${norm}.mdx`, `${norm}/index.md`, `${norm}/index.mdx`]);
+  return getDocs().find((d) => candidates.has(d.file));
+}
+
 export function findDocByName(name: string): Doc | undefined {
   const n = name.trim().toLowerCase();
   return getDocs().find(

@@ -4,10 +4,5 @@
   "$id": "guides",
   "root": true,
   "icon": "GraduationCap",
-  "color": "hsl(217 90% 65%)",
-  "pages": [
-    "quick-start",
-    "...",
-    "deploy"
-  ]
+  "color": "hsl(217 90% 65%)"
 }

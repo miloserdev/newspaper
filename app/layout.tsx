@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { config } from "@/config";
 import { getMenu, getSite } from "@/lib/content";
 import { Sidebar } from "@/components/sidebar";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -27,7 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               m.kind === "section"
                 ? { kind: "section" as const, title: m.section.title, slug: m.section.slug, count: m.section.count, depth: m.section.depth, icon: <SectionIcon name={m.section.icon} color={m.section.color} className="size-4" /> }
                 : m,
-            )} links={config.links} />
+            )} links={site.links} />
             <main className="flex min-h-0 min-w-0 flex-1">{children}</main>
           </div>
         </SearchProvider>

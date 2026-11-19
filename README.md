@@ -10,6 +10,7 @@
 - **Search out of the box.** Full-text, typo-tolerant, runs in the browser from a prebuilt index — no server, no external service — <kbd>Ctrl</kbd>+<kbd>K</kbd>.
 - **Static export.** `npm run build:static` produces a plain HTML site (`out/`) — GitHub Pages workflow included.
 - **Infinite scroll** in the feed and in the `<NewsList />` component.
+- **"On this page" table of contents** (Clerk-style: a track line with a sliding thumb that follows the headings in view) on wide screens, a collapsible one on narrow screens.
 - Dark / light / system theme. Responsive: three columns from 1024px, a single column on mobile.
 
 Stack: Next.js 16 (App Router) · React 19 · Tailwind CSS 4 · shadcn/ui · react-markdown · MiniSearch.
@@ -66,6 +67,67 @@ What's different in the static build:
 - Search runs in the browser against `data/search-index.json`; the feed is paged JSON files in `data/feed/`.
 - **Dates come from git history** in the workflow (`GIT_DATES=1`, full clone): first commit of a file = created, last commit = updated. A fresh checkout gives every file the same filesystem time, so without this all posts would share one date. A `date:` in the frontmatter always wins. If you import a whole vault in a single commit, put `date:` in the frontmatter to get a meaningful order.
 - Content changes need a new build (a new push) — nothing is read at request time.
+
+## Content in a separate repository
+
+The engine and the content don't have to live together. Keep this repo as the engine, and put the markdown into another repo (for example `docs`) that only contains content — the GitHub Actions workflow there fetches the engine, builds the site against that content and publishes it to Pages.
+
+```
+newspaper/   (this repo — the engine)
+docs/        (content repo: meta.json, index.mdx, <sections>/…  +  .github/workflows/pages.yml)
+```
+
+1. Copy [`templates/docs-repo/`](templates/docs-repo) into the content repo (the folder is hidden-file aware: `.github/workflows/pages.yml` is the important part).
+2. In the workflow, `ENGINE_REPO` / `ENGINE_REF` choose the engine repo and its branch or tag; `CONTENT_PATH` is the content folder inside the content repo (`.` = repo root).
+3. Content repo → Settings → Pages → Source: **GitHub Actions**, then push.
+
+The site name, tagline, icon and the menu links are taken from the root `meta.json` of the content (`title`, `description`, `icon`, `links`), so the content repo needs no `config.ts`:
+
+```json
+{
+  "title": "docs",
+  "description": "documentation from markdown files",
+  "icon": "BookOpen",
+  "links": [{ "title": "My site", "href": "https://example.com" }]
+}
+```
+
+Locally, point the engine at any folder with `CONTENT_DIR`:
+
+```bash
+CONTENT_DIR=../docs npm run dev
+CONTENT_DIR=../docs BASE_PATH=/docs npm run build:static
+```
+
+After the engine changes, re-run the workflow in the content repo (Actions → Run workflow) to rebuild with the new engine.
+
+## Validation and CI
+
+Publishing is separate from rendering: the site is built once from a Git commit and that exact build is what gets deployed. Before that, the content is validated, so a broken document fails the pipeline instead of reaching production.
+
+```bash
+npm run validate                    # validates config.contentDir (or $CONTENT_DIR)
+npm run validate -- --strict        # warnings fail the run, too
+npm run validate -- --json          # machine-readable report
+CONTENT_DIR=../docs npm run validate
+```
+
+| Level | Examples |
+| --- | --- |
+| **error** (fails CI) | invalid `meta.json`; invalid front matter YAML (e.g. an unquoted `description: a: b`); invalid `date`; missing image / `![[embed]]` / front matter `image`; relative link to a post that doesn't exist; a link pointing outside the vault; two files with the same URL; duplicate section `$id` |
+| **warning** | `[[wikilink]]` that matches no post; unknown lucide icon; `pages` entry that matches nothing (typo); post without a title; a `.md` outside any section (it isn't published); no root `meta.json` |
+
+Links inside code blocks are not checked. In GitHub Actions the issues appear as annotations on the changed files.
+
+Relative links between posts work as in Obsidian and on GitHub: `[x](./other.md)`, `[x](../guides/setup.md#heading)`, `[x](other)` and `[x](<path with spaces.md>)` are all rewritten to the post's URL.
+
+**Workflows**
+
+- Pushes to `main`/`master`: validate → build the static site once → deploy that artifact.
+- Pull requests: validate → build a **preview artifact from the exact PR commit** (Actions run → Artifacts → `site-preview-<sha>`; unzip and `npx serve`). Nothing is deployed.
+- The engine repo's own `CI` workflow runs types, lint, the validator tests and a real static export of the fixture vaults.
+
+**Fixture vaults** (`fixtures/`) keep the edge cases from regressing: `basic` (Cyrillic names, spaces, `(group)` folders, nested sections, tags with `/`, every link kind — must validate with zero issues) and `broken` (one of each mistake — must fail with the expected codes). `npm test` runs the validator against them; `npm run test:build` additionally renders `basic` with a real static export and checks the generated pages, links and search index. Add a vault there whenever a path or nesting bug turns up.
 
 ## Content structure
 
@@ -184,6 +246,9 @@ content/           demo content
 | --- | --- |
 | `npm run dev` | dev server with live reload |
 | `npm run build` | production build |
-| `npm run build:static` | static export into `out/` (`BASE_PATH`, `GIT_DATES=1` optional) |
+| `npm run build:static` | static export into `out/` (`BASE_PATH`, `GIT_DATES=1`, `CONTENT_DIR` optional) |
 | `npm start` | serve the production build |
 | `npm run lint` | ESLint |
+| `npm run validate` | check content: front matter, `meta.json`, links, assets |
+| `npm test` | validator tests on `fixtures/` |
+| `npm run test:build` | render the fixture vaults (static export) and check the output |

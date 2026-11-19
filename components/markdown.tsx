@@ -107,7 +107,7 @@ export function Markdown({ doc }: { doc: Doc }) {
     return `${BASE_PATH}/files/${enc(rel)}`;
   };
   return (
-    <div className="prose prose-neutral dark:prose-invert max-w-none prose-img:rounded-lg prose-li:my-1 prose-h1:text-2xl prose-h2:mt-10 break-words [overflow-wrap:anywhere]">
+    <div className="prose prose-neutral dark:prose-invert max-w-none prose-img:rounded-lg prose-li:my-1 prose-h1:mt-14 prose-h1:text-2xl prose-h2:mt-10 break-words [overflow-wrap:anywhere]">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkCallouts]}
         rehypePlugins={[rehypeRaw, rehypeSlug, [rehypeHighlight, { detect: false, ignoreMissing: true }]]}
@@ -130,7 +130,7 @@ export function Markdown({ doc }: { doc: Doc }) {
             ),
         }) as Components}
       >
-        {preprocess(doc.body)}
+        {preprocess(doc.body, doc)}
       </ReactMarkdown>
     </div>
   );

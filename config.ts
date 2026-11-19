@@ -7,8 +7,8 @@
 
 export const config = {
   /** Root content directory (e.g. an Obsidian vault). Relative to the project root, or an absolute path */
-  contentDir: "./content",
-  /** Links at the bottom of the menu */
+  contentDir: process.env.CONTENT_DIR ?? "./content", // CONTENT_DIR: build the site from content that lives in another repo/folder
+  /** Links at the bottom of the menu (default; the root meta.json can override them with its own `links`) */
   links: [
     { title: "GitHub", href: "https://github.com/miloserdev/newspaper" },
     { title: "Next.js", href: "https://nextjs.org" },

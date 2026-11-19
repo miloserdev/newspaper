@@ -1,0 +1,104 @@
+# Publishes this repository's markdown (an Obsidian vault, a docs folder, ...) as a website on GitHub Pages.
+# The site engine is NOT in this repo: the workflow checks out miloserdev/newspaper and builds it against this content.
+#  - push to main/master  → validate → build once → deploy THAT build (an immutable artifact)
+#  - pull request         → validate → build a preview from the exact PR commit, uploaded as an artifact; no deploy
+#
+# One-time setup: repo → Settings → Pages → Build and deployment → Source: "GitHub Actions".
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch: # also use "Run workflow" to rebuild after the engine was updated
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-${{ github.event_name == 'pull_request' && github.ref || 'site' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  ENGINE_REPO: miloserdev/newspaper # the engine
+  ENGINE_REF: master                # branch, tag or commit of the engine (pin a tag for stable builds)
+  CONTENT_PATH: .                   # folder with meta.json / markdown inside this repo (. = repo root)
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout content (this repo)
+        uses: actions/checkout@v4
+        with:
+          path: content-repo
+          fetch-depth: 0 # full history: post dates come from git
+
+      - name: Checkout engine
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.ENGINE_REPO }}
+          ref: ${{ env.ENGINE_REF }}
+          path: engine
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install engine dependencies
+        working-directory: engine
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
+
+      # Broken front matter / meta.json, missing images, dead relative links… fail here (annotated on the PR).
+      - name: Validate content
+        working-directory: engine
+        env:
+          CONTENT_DIR: ${{ github.workspace }}/content-repo/${{ env.CONTENT_PATH }}
+        run: npm run validate
+
+      - name: Build static site
+        working-directory: engine
+        env:
+          STATIC_EXPORT: "1"
+          GIT_DATES: "1"
+          CONTENT_DIR: ${{ github.workspace }}/content-repo/${{ env.CONTENT_PATH }}
+        run: |
+          REPO="${GITHUB_REPOSITORY#*/}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            export BASE_PATH="" # the preview is opened from a local static server, at the root
+          elif [[ "$REPO" == *.github.io ]]; then
+            export BASE_PATH="" # <user>.github.io repos are served from the root
+          else
+            export BASE_PATH="/$REPO"
+          fi
+          echo "BASE_PATH=$BASE_PATH  CONTENT_DIR=$CONTENT_DIR"
+          npm run build
+          touch out/.nojekyll
+
+      - name: Upload site (deploy)
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: engine/out
+
+      - name: Upload preview artifact (PR)
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-preview-${{ github.event.pull_request.head.sha }}
+          path: engine/out
+          retention-days: 7
+
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

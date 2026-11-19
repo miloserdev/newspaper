@@ -1,0 +1,7 @@
+{
+  "title": "Fixture Basic",
+  "description": "A vault with awkward paths",
+  "icon": "BookOpen",
+  "links": [{ "title": "Example", "href": "https://example.com" }],
+  "pages": ["handbook", "---More---", "..."]
+}

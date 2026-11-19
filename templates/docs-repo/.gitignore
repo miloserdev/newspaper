@@ -1,0 +1,4 @@
+.DS_Store
+# Obsidian: keep the vault config out of the published repo if you prefer
+# .obsidian/
+.trash/

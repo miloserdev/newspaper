@@ -1,10 +1,13 @@
-# Builds the site as a static export and publishes it to GitHub Pages on every push.
+# Validates the content, builds the site as a static export and publishes it to GitHub Pages.
+#  - push to main/master  → validate → build once → deploy THAT build (an immutable artifact, nothing is re-rendered later)
+#  - pull request         → validate → build a preview artifact from the exact PR commit (download it from the run); no deploy
 # One-time setup: repo → Settings → Pages → Build and deployment → Source: "GitHub Actions".
 name: Deploy to GitHub Pages
 
 on:
   push:
     branches: [main, master]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -13,8 +16,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
-  cancel-in-progress: true
+  group: pages-${{ github.event_name == 'pull_request' && github.ref || 'site' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -33,24 +36,44 @@ jobs:
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm install --no-audit --no-fund; fi
 
+      # Broken front matter / meta.json, missing images, dead relative links… fail here (annotated on the PR), not in production.
+      - name: Validate content
+        run: npm run validate
+
       - name: Build static site
         env:
           STATIC_EXPORT: "1"
           GIT_DATES: "1"
         run: |
           REPO="${GITHUB_REPOSITORY#*/}"
-          # <user>.github.io repos are served from the root, everything else from /<repo>
-          if [[ "$REPO" == *.github.io ]]; then export BASE_PATH=""; else export BASE_PATH="/$REPO"; fi
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            export BASE_PATH="" # the preview is opened from a local static server, at the root
+          elif [[ "$REPO" == *.github.io ]]; then
+            export BASE_PATH="" # <user>.github.io repos are served from the root
+          else
+            export BASE_PATH="/$REPO"
+          fi
           echo "BASE_PATH=$BASE_PATH"
           npm run build
           touch out/.nojekyll
 
-      - uses: actions/upload-pages-artifact@v3
+      - name: Upload site (deploy)
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: out
 
+      - name: Upload preview artifact (PR)
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-preview-${{ github.event.pull_request.head.sha }}
+          path: out
+          retention-days: 7
+
   deploy:
     needs: build
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

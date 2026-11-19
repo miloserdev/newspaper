@@ -158,3 +158,5 @@
 .prose summary { cursor: pointer; font-weight: 500; }
 .prose li > p { margin: 0.25rem 0; }
 .prose ul ul, .prose ol ol, .prose ul ol, .prose ol ul { margin: 0.25rem 0; }
+
+.prose :is(h1, h2, h3, h4) { scroll-margin-top: 1.5rem; }

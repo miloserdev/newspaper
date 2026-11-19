@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
   ...(staticExport ? { output: "export" as const, images: { unoptimized: true } } : {}),
   basePath,
   // static export is written into distDir: "out" (also keeps it apart from a running `next dev`)
-  distDir: staticExport ? "out" : ".next",
+  distDir: staticExport ? (process.env.EXPORT_DIR ?? "out") : ".next",
   env: { NEXT_PUBLIC_BASE_PATH: basePath },
   devIndicators: { position: "bottom-right" },
   /* config options here */
